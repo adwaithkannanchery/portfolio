@@ -425,7 +425,7 @@ function App() {
   const [section, setSection] = useState<SectionKey>('HOME');
   const [intro, setIntro] = useState(true);
   const [menu, setMenu] = useState(false);
-  const [sound, setSound] = useState(false);
+  const [sound, setSound] = useState(true);
   const [reduced, setReduced] = useState(false);
   const audioContext = useRef<AudioContext | null>(null);
   const mainRef = useRef<HTMLElement>(null);
