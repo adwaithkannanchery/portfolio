@@ -9,6 +9,9 @@ import { resume } from './data/resume';
 import './styles.css';
 
 type SectionKey = 'HOME' | 'ABOUT' | 'SKILLS' | 'EDUCATION' | 'PROJECTS' | 'EXPERIENCE' | 'CONTACT';
+type TouchGesture =
+  | { kind: 'swipe'; startX: number; startY: number; target: Element | null }
+  | { kind: 'pinch'; startDistance: number; lastDistance: number };
 
 const worlds: Record<SectionKey, { z: number; color: string; label: string }> = {
   HOME: { z: 18, color: '#7be7ff', label: 'ORIGIN' },
@@ -371,6 +374,8 @@ function App() {
   const [sound, setSound] = useState(false);
   const [reduced, setReduced] = useState(false);
   const audioContext = useRef<AudioContext | null>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const touchGesture = useRef<TouchGesture | null>(null);
   const targetZ = worlds[section].z;
   const sections = Object.keys(worlds) as SectionKey[];
   const playWhoosh = (enabled = sound) => {
@@ -416,25 +421,93 @@ function App() {
     setSection(s);
     setMenu(false);
   };
+  const advance = (direction: -1 | 1) => {
+    const index = sections.indexOf(section);
+    const next = Math.max(0, Math.min(sections.length - 1, index + direction));
+    if (next !== index) go(sections[next]);
+  };
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
     setReduced(mq.matches);
+    const main = mainRef.current;
+    if (!main) return;
+    const getPinchDistance = (touches: TouchList) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       if (intro) return;
       if (Math.abs(e.deltaY) < 18) return;
-      const dir = e.deltaY > 0 ? -1 : 1;
-      const idx = sections.indexOf(section);
-      const next = Math.max(0, Math.min(sections.length - 1, idx + dir));
-      if (next !== idx) go(sections[next]);
+      advance(e.deltaY > 0 ? -1 : 1);
     };
+    const onTouchStart = (e: TouchEvent) => {
+      if (intro || menu) {
+        touchGesture.current = null;
+      } else if (e.touches.length === 2) {
+        const distance = getPinchDistance(e.touches);
+        touchGesture.current = { kind: 'pinch', startDistance: distance, lastDistance: distance };
+      } else if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        touchGesture.current = { kind: 'swipe', startX: touch.clientX, startY: touch.clientY, target: e.target instanceof Element ? e.target : null };
+      } else {
+        touchGesture.current = null;
+      }
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      const gesture = touchGesture.current;
+      if (gesture?.kind === 'pinch' && e.touches.length === 2) {
+        e.preventDefault();
+        gesture.lastDistance = getPinchDistance(e.touches);
+      }
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      const gesture = touchGesture.current;
+      if (!gesture) return;
+
+      if (gesture.kind === 'pinch') {
+        if (e.touches.length > 0) return;
+        touchGesture.current = null;
+        const scale = gesture.lastDistance / gesture.startDistance;
+        if (scale > 1.16) advance(1);
+        else if (scale < 1 / 1.16) advance(-1);
+        return;
+      }
+
+      if (e.touches.length > 0 || e.changedTouches.length !== 1) return;
+      touchGesture.current = null;
+      const touch = e.changedTouches[0];
+      const deltaX = touch.clientX - gesture.startX;
+      const deltaY = touch.clientY - gesture.startY;
+      if (Math.abs(deltaY) < 48 || Math.abs(deltaY) < Math.abs(deltaX) * 1.25) return;
+      if (gesture.target?.closest('button, a, input, textarea, select')) return;
+
+      const overlay = gesture.target?.closest('.overlay');
+      if (overlay instanceof HTMLElement && overlay.scrollHeight > overlay.clientHeight) {
+        const canScroll = deltaY < 0
+          ? overlay.scrollTop + overlay.clientHeight < overlay.scrollHeight - 2
+          : overlay.scrollTop > 2;
+        if (canScroll) return;
+      }
+
+      advance(deltaY < 0 ? 1 : -1);
+    };
+    const onTouchCancel = () => { touchGesture.current = null; };
+
     window.addEventListener('wheel', onWheel, { passive: false });
-    return () => window.removeEventListener('wheel', onWheel);
-  }, [section, sections, intro]);
+    main.addEventListener('touchstart', onTouchStart, { passive: true });
+    main.addEventListener('touchmove', onTouchMove, { passive: false });
+    main.addEventListener('touchend', onTouchEnd, { passive: true });
+    main.addEventListener('touchcancel', onTouchCancel, { passive: true });
+    return () => {
+      window.removeEventListener('wheel', onWheel);
+      main.removeEventListener('touchstart', onTouchStart);
+      main.removeEventListener('touchmove', onTouchMove);
+      main.removeEventListener('touchend', onTouchEnd);
+      main.removeEventListener('touchcancel', onTouchCancel);
+    };
+  }, [section, sections, intro, menu]);
 
   return <>
-    <main aria-hidden={intro}>
+    <main ref={mainRef} aria-hidden={intro}>
     <div className="scene"><Scene targetZ={targetZ} reduced={reduced} /></div>
     <div className="vignette" />
     <div className="film-grain" />
@@ -461,7 +534,7 @@ function App() {
 
     <div className="camera-readout"><span>CAMERA Z</span><strong>{Math.abs(targetZ).toFixed(0).padStart(3,'0')}</strong><span>·</span><span>SPATIAL MODE</span></div>
     <div className="controls"><button onClick={() => { const idx = sections.indexOf(section); if (idx < sections.length - 1) go(sections[idx + 1]); }}><ZoomIn size={15}/></button><button onClick={() => { const idx = sections.indexOf(section); if (idx > 0) go(sections[idx - 1]); }}><ZoomOut size={15}/></button><button onClick={() => go('HOME')}><RotateCcw size={15}/></button></div>
-    <div className="explore-hint"><ArrowDown size={13}/> SCROLL TO TRAVEL THROUGH SPACE</div>
+    <div className="explore-hint"><ArrowDown size={13}/> SWIPE / SCROLL TO TRAVEL THROUGH SPACE</div>
     </main>
     <AnimatePresence>{intro && <OpeningPage onEnter={() => { playWhoosh(); setIntro(false); }} />}</AnimatePresence>
   </>;
@@ -483,7 +556,7 @@ function OpeningPage({ onEnter }: { onEnter: () => void }) {
 }
 
 function Overlay({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) { return <motion.div className="overlay" initial={{opacity:0, filter:'blur(12px)', y:20}} animate={{opacity:1, filter:'blur(0px)', y:0}} exit={{opacity:0, filter:'blur(12px)', y:-20}} transition={{duration:.75, ease:[.16,1,.3,1]}}><div className="eyebrow">{eyebrow}</div><h2>{title}</h2>{children}</motion.div>; }
-function HomeOverlay({go}:{go:(s:SectionKey)=>void}) { return <div className="home-overlay"><div className="home-kicker"><span aria-hidden="true" />PERSONAL PORTFOLIO</div><h1><span>ADWAITH</span><em>K.</em></h1><p>Designing premium worlds where code, motion, and imagination create a cinematic digital experience that feels alive.</p><button className="enter" onClick={()=>go('ABOUT')}>ENTER THE STORY <ChevronRight size={16}/></button><div className="home-note">SCROLL / ZOOM TO EXPLORE</div></div>; }
+function HomeOverlay({go}:{go:(s:SectionKey)=>void}) { return <div className="home-overlay"><div className="home-kicker"><span aria-hidden="true" />PERSONAL PORTFOLIO</div><h1><span>ADWAITH</span><em>K.</em></h1><p>Designing premium worlds where code, motion, and imagination create a cinematic digital experience that feels alive.</p><button className="enter" onClick={()=>go('ABOUT')}>ENTER THE STORY <ChevronRight size={16}/></button><div className="home-note">SWIPE / SCROLL TO EXPLORE</div></div>; }
 function AboutOverlay(){return <Overlay eyebrow="01 / ABOUT WORLD" title="Building with curiosity."><p>{resume.profile}</p><div className="metric-row"><div><strong>03</strong><span>PROJECT WORLDS</span></div><div><strong>01</strong><span>CURRENT INTERNSHIP</span></div><div><strong>NSS</strong><span>LEADERSHIP</span></div></div></Overlay>;}
 function SkillsOverlay(){const skills=['Java','Spring Boot','MySQL','Python','Machine Learning','Neural Networks','Full-Stack Web','Accessibility','GitHub','VS Code']; return <Overlay eyebrow="02 / SKILLS CONSTELLATION" title="A system of tools."><p>Technologies and areas represented by the supplied resume and projects.</p><div className="skill-grid">{skills.map((x,i)=><motion.div key={x} whileHover={{scale:1.04, y:-4}} className="skill-pill"><span>0{i+1}</span>{x}</motion.div>)}</div></Overlay>;}
 function EducationOverlay(){return <Overlay eyebrow="03 / EDUCATION RIFT" title="The path so far."><div className="education-grid">{resume.education.map((e,i)=><div className="edu" key={i}><span>{e[0]}</span><h3>{e[2]}</h3><p>{e[1]}</p></div>)}</div></Overlay>;}
