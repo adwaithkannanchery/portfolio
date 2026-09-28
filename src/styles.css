@@ -62,3 +62,4 @@ nav button.active::after{content:"";position:absolute;left:0;right:0;bottom:-8px
 @media(max-width:380px){.opening-copy h1{font-size:3.6rem}.opening-footer span:first-child{max-width:180px}}
 @media(prefers-reduced-motion:reduce){.opening-enter{transition:none}}
 @media(max-width:900px){.explore-hint{display:flex;bottom:68px;padding:7px 10px;font-size:7px;letter-spacing:.1em;white-space:nowrap}}
+@media(pointer:coarse){html,body,#root,main,.opening-page{touch-action:pan-x pan-y}}
