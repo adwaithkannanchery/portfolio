@@ -253,22 +253,69 @@ function createNightTexture() {
   return texture;
 }
 
+function createCloudTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 2048;
+  canvas.height = 1024;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return new THREE.CanvasTexture(canvas);
+
+  let seed = 173;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+
+  for (let i = 0; i < 260; i++) {
+    const x = random() * canvas.width;
+    const y = random() * canvas.height;
+    const radius = 20 + random() * 115;
+    const opacity = 0.08 + random() * 0.12;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate((random() - 0.5) * 1.4);
+    ctx.scale(radius, radius * (0.18 + random() * 0.34));
+    const cloud = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    cloud.addColorStop(0, `rgba(255,255,255,${opacity})`);
+    cloud.addColorStop(0.56, `rgba(255,255,255,${opacity * 0.68})`);
+    cloud.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = cloud;
+    ctx.beginPath();
+    ctx.arc(0, 0, 1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 function EarthHome() {
   const ref = useRef<THREE.Group>(null!);
+  const cloudsRef = useRef<THREE.Mesh>(null!);
   const earthTexture = useTexture('https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1600&q=80');
   const nightTexture = useMemo(() => createNightTexture(), []);
+  const cloudTexture = useMemo(() => createCloudTexture(), []);
 
   useFrame((state, delta) => {
     ref.current.rotation.y += delta * 0.08;
     ref.current.rotation.z = Math.sin(state.clock.elapsedTime * 0.6) * 0.14;
     ref.current.position.x = 9 + Math.sin(state.clock.elapsedTime * 0.7) * 0.8;
     ref.current.position.y = 1.4 + Math.cos(state.clock.elapsedTime * 0.9) * 0.8;
+    cloudsRef.current.rotation.y += delta * 0.012;
   });
 
   return <group ref={ref} position={[9, 1.4, -18]}>
     <mesh>
       <sphereGeometry args={[2.8, 64, 64]} />
       <meshStandardMaterial map={earthTexture} emissiveMap={nightTexture} emissive={new THREE.Color('#9ec4ff')} emissiveIntensity={1.4} roughness={0.9} metalness={0.12} />
+    </mesh>
+    <mesh ref={cloudsRef}>
+      <sphereGeometry args={[2.835, 64, 64]} />
+      <meshPhongMaterial map={cloudTexture} color="#dce8f5" transparent opacity={0.56} specular="#7188a3" shininess={10} depthWrite={false} />
     </mesh>
     <mesh scale={1.08}>
       <sphereGeometry args={[2.9, 56, 56]} />
@@ -279,18 +326,25 @@ function EarthHome() {
 
 function HomeBeacon() {
   const ref = useRef<THREE.Group>(null!);
+  const cloudsRef = useRef<THREE.Mesh>(null!);
   const earthTexture = useTexture('https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1600&q=80');
   const nightTexture = useMemo(() => createNightTexture(), []);
+  const cloudTexture = useMemo(() => createCloudTexture(), []);
   useFrame((state, delta) => {
     ref.current.rotation.y += delta * 0.08;
     ref.current.rotation.z = Math.sin(state.clock.elapsedTime * 0.6) * 0.035;
     ref.current.position.y = Math.cos(state.clock.elapsedTime * 0.45) * 0.16;
+    cloudsRef.current.rotation.y += delta * 0.012;
   });
 
   return <group ref={ref} position={[0, 0, 18]}>
     <mesh>
       <sphereGeometry args={[2.8, 64, 64]} />
       <meshStandardMaterial map={earthTexture} emissiveMap={nightTexture} emissive={new THREE.Color('#9ec4ff')} emissiveIntensity={1.4} roughness={0.9} metalness={0.12} />
+    </mesh>
+    <mesh ref={cloudsRef}>
+      <sphereGeometry args={[2.835, 64, 64]} />
+      <meshPhongMaterial map={cloudTexture} color="#dce8f5" transparent opacity={0.56} specular="#7188a3" shininess={10} depthWrite={false} />
     </mesh>
     <mesh scale={1.08}>
       <sphereGeometry args={[2.9, 56, 56]} />
