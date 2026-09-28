@@ -398,7 +398,7 @@ function App() {
     filter.frequency.exponentialRampToValueAtTime(1250, now + 0.34);
     filter.frequency.exponentialRampToValueAtTime(320, now + 1.3);
     noiseGain.gain.setValueAtTime(0.0001, now);
-    noiseGain.gain.exponentialRampToValueAtTime(0.032, now + 0.24);
+    noiseGain.gain.exponentialRampToValueAtTime(0.06, now + 0.24);
     noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.32);
     noise.connect(filter).connect(noiseGain).connect(context.destination);
     noise.start(now);
@@ -410,7 +410,7 @@ function App() {
     tone.frequency.setValueAtTime(78, now);
     tone.frequency.exponentialRampToValueAtTime(42, now + 1.3);
     toneGain.gain.setValueAtTime(0.0001, now);
-    toneGain.gain.exponentialRampToValueAtTime(0.018, now + 0.22);
+    toneGain.gain.exponentialRampToValueAtTime(0.032, now + 0.22);
     toneGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.32);
     tone.connect(toneGain).connect(context.destination);
     tone.start(now);
